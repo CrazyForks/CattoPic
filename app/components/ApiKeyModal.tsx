@@ -201,7 +201,7 @@ export default function ApiKeyModal({ isOpen, onClose, onSuccess }: ApiKeyModalP
                         </div>
 
                         <p className="text-gray-600 dark:text-gray-300 mb-6">
-                            请输入您的 API 密钥以使用 ImageFlow 服务
+                            请输入您的 API 密钥以使用 CattoPic 服务
                         </p>
 
                         <form onSubmit={handleSubmit}>

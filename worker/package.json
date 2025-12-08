@@ -1,14 +1,14 @@
 {
-  "name": "imageflow-worker",
+  "name": "cattopic-worker",
   "version": "1.0.0",
-  "description": "ImageFlow Cloudflare Worker API",
+  "description": "CattoPic Cloudflare Worker API",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
   },
-  "keywords": ["cloudflare", "worker", "imageflow"],
+  "keywords": ["cloudflare", "worker", "cattopic"],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.24.0",

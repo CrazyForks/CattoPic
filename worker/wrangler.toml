@@ -1,27 +1,27 @@
-name = "imageflow-worker"
-main = "src/index.ts"
-compatibility_date = "2024-12-01"
-compatibility_flags = ["nodejs_compat"]
+name = 'cattopic-worker'
+main = 'src/index.ts'
+compatibility_date = '2024-12-01'
+compatibility_flags = ['nodejs_compat']
 
 [vars]
-ENVIRONMENT = "production"
+ENVIRONMENT = 'production'
 
 # R2 Bucket binding
 [[r2_buckets]]
-binding = "R2_BUCKET"
-bucket_name = "imageflow-bucket"
+binding = 'R2_BUCKET'
+bucket_name = 'cattopic-r2'
 
 # D1 Database binding
 [[d1_databases]]
-binding = "DB"
-database_name = "imageflow-db"
-database_id = "b1effb83-bac4-4c57-b018-3c7bd837e55e"
+binding = 'DB'
+database_name = 'CattoPic-D1'
+database_id = 'cb07b667-2a42-4ca1-84ce-49d5114af009'
 
 # Cron Triggers - cleanup expired images every hour
 [triggers]
-crons = ["0 * * * *"]
+crons = ['0 * * * *']
 
 # Development settings
 [dev]
 port = 8787
-local_protocol = "http"
+local_protocol = 'http'

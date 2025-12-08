@@ -17,7 +17,7 @@ const notoSansSC = Noto_Sans_SC({
 });
 
 export const metadata: Metadata = {
-  title: "ImageFlow - 图片管理",
+  title: "CattoPic - 图片管理",
   description: "一个简单而强大的图片管理工具",
   icons: {
     icon: [

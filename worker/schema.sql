@@ -1,4 +1,4 @@
--- ImageFlow D1 Database Schema
+-- CattoPic D1 Database Schema
 
 CREATE TABLE IF NOT EXISTS images (
     id TEXT PRIMARY KEY,

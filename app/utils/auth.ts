@@ -1,4 +1,4 @@
-const API_KEY_KEY = "imageflow_api_key";
+const API_KEY_KEY = "cattopic_api_key";
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 export const getApiKey = (): string | null => {
   if (typeof window !== "undefined") {

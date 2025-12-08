@@ -19,7 +19,7 @@ export default function Header({ onApiKeyClick, title, isKeyVerified = false }: 
   const getTitle = () => {
     if (title) return title
     if (pathname === '/manage') return '图片管理'
-    return 'ImageFlow'
+    return 'CattoPic'
   }
 
   return (

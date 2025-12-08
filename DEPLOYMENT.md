@@ -1,4 +1,4 @@
-# ImageFlow 部署指南
+# CattoPic 部署指南
 
 ## 项目架构
 
@@ -51,13 +51,13 @@ pnpm wrangler login
 ### 1.2 创建 R2 Bucket
 
 ```bash
-pnpm wrangler r2 bucket create imageflow-bucket --location=apac
+pnpm wrangler r2 bucket create cattopic-r2 --location=apac
 ```
 
 ### 1.3 创建 D1 数据库
 
 ```bash
-pnpm wrangler d1 create imageflow-db --location=apac
+pnpm wrangler d1 create CattoPic-D1 --location=apac
 # 记录返回的 database_id
 ```
 
@@ -66,7 +66,7 @@ pnpm wrangler d1 create imageflow-db --location=apac
 ### 1.4 初始化数据库表结构
 
 ```bash
-pnpm wrangler d1 execute imageflow-db --remote --file=schema.sql
+pnpm wrangler d1 execute CattoPic-D1 --remote --file=schema.sql
 ```
 
 ### 1.5 配置 wrangler.toml
@@ -74,7 +74,7 @@ pnpm wrangler d1 execute imageflow-db --remote --file=schema.sql
 编辑 `worker/wrangler.toml`，填入上一步获取的 ID：
 
 ```toml
-name = "imageflow-worker"
+name = "CattoPic-Worker"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
@@ -84,11 +84,11 @@ ENVIRONMENT = "production"
 
 [[r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "imageflow-bucket"
+bucket_name = "cattopic-r2"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "imageflow-db"
+database_name = "CattoPic-D1"
 database_id = "<your-d1-database-id>"
 ```
 
@@ -105,15 +105,15 @@ pnpm wrangler deploy
 
 部署成功后输出示例：
 ```
-Uploaded imageflow-worker
-Deployed imageflow-worker triggers
-  https://imageflow-worker.<your-subdomain>.workers.dev
+Uploaded CattoPic-Worker
+Deployed CattoPic-Worker triggers
+  https://CattoPic-Worker.<your-subdomain>.workers.dev
 ```
 
 ### 2.2 添加 API Key
 
 ```bash
-pnpm wrangler d1 execute imageflow-db --remote --command "
+pnpm wrangler d1 execute CattoPic-D1 --remote --command "
 INSERT INTO api_keys (key, created_at) VALUES ('your-api-key-here', datetime('now'));
 "
 ```
@@ -124,7 +124,7 @@ INSERT INTO api_keys (key, created_at) VALUES ('your-api-key-here', datetime('no
 # 测试认证
 curl -X POST \
   -H "Authorization: Bearer your-api-key-here" \
-  https://imageflow-worker.<your-subdomain>.workers.dev/api/validate-api-key
+  https://CattoPic-Worker.<your-subdomain>.workers.dev/api/validate-api-key
 
 # 预期返回
 {"success":true,"message":"API key is valid"}
@@ -144,7 +144,7 @@ curl -X POST \
 
 | 变量名 | 值 | 说明 |
 |--------|-----|------|
-| `NEXT_PUBLIC_WORKER_URL` | `https://imageflow-worker.xxx.workers.dev` | Worker API 地址 |
+| `NEXT_PUBLIC_WORKER_URL` | `https://CattoPic-Worker.xxx.workers.dev` | Worker API 地址 |
 
 ### 3.3 部署
 
@@ -215,13 +215,13 @@ Authorization: Bearer <your-api-key>
 检查 API Key 是否已添加到数据库：
 
 ```bash
-pnpm wrangler d1 execute imageflow-db --remote --command "SELECT * FROM api_keys;"
+pnpm wrangler d1 execute CattoPic-D1 --remote --command "SELECT * FROM api_keys;"
 ```
 
 ### Q2: 如何添加新的 API Key
 
 ```bash
-pnpm wrangler d1 execute imageflow-db --remote --command "
+pnpm wrangler d1 execute CattoPic-D1 --remote --command "
 INSERT INTO api_keys (key, created_at) VALUES ('new-api-key', datetime('now'));
 "
 ```
@@ -229,7 +229,7 @@ INSERT INTO api_keys (key, created_at) VALUES ('new-api-key', datetime('now'));
 ### Q3: 如何删除 API Key
 
 ```bash
-pnpm wrangler d1 execute imageflow-db --remote --command "
+pnpm wrangler d1 execute CattoPic-D1 --remote --command "
 DELETE FROM api_keys WHERE key = 'old-api-key';
 "
 ```

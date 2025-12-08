@@ -198,7 +198,7 @@ export default function Manage() {
     <div className="max-w-7xl mx-auto px-6 py-8">
       <Header
         onApiKeyClick={() => setShowApiKeyModal(true)}
-        title="ImageFlow"
+        title="CattoPic"
         isKeyVerified={isKeyVerified}
       />
 
