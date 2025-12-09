@@ -53,7 +53,7 @@ export function useTags(): UseTagsReturn {
       }
       throw new Error('Failed to fetch tags');
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 0, // 始终获取最新数据
   });
 
   const tags = data || [];
@@ -67,9 +67,9 @@ export function useTags(): UseTagsReturn {
       }
       return response;
     },
-    onSuccess: () => {
-      // Invalidate and refetch tags list
-      queryClient.invalidateQueries({ queryKey: queryKeys.tags.list() });
+    onSuccess: async () => {
+      // 强制立即刷新标签列表
+      await queryClient.refetchQueries({ queryKey: queryKeys.tags.list() });
     },
   });
 
@@ -85,7 +85,7 @@ export function useTags(): UseTagsReturn {
       }
       return { oldName, newName, response };
     },
-    onSuccess: ({ oldName, newName }) => {
+    onSuccess: async ({ oldName, newName }) => {
       // Update selection
       setSelectedTags((prev) => {
         if (prev.has(oldName)) {
@@ -96,9 +96,11 @@ export function useTags(): UseTagsReturn {
         }
         return prev;
       });
-      // Invalidate tags and image lists
-      queryClient.invalidateQueries({ queryKey: queryKeys.tags.list() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.images.lists() });
+      // 强制立即刷新标签和图片列表
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: queryKeys.tags.list() }),
+        queryClient.refetchQueries({ queryKey: queryKeys.images.lists() }),
+      ]);
     },
   });
 
@@ -113,16 +115,18 @@ export function useTags(): UseTagsReturn {
       }
       return name;
     },
-    onSuccess: (name) => {
+    onSuccess: async (name) => {
       // Update selection
       setSelectedTags((prev) => {
         const next = new Set(prev);
         next.delete(name);
         return next;
       });
-      // Invalidate tags and image lists
-      queryClient.invalidateQueries({ queryKey: queryKeys.tags.list() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.images.lists() });
+      // 强制立即刷新标签和图片列表（删除标签会连带删除图片）
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: queryKeys.tags.list() }),
+        queryClient.refetchQueries({ queryKey: queryKeys.images.lists() }),
+      ]);
     },
   });
 

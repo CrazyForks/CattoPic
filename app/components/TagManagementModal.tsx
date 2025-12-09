@@ -1,8 +1,11 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { TagIcon, Cross1Icon } from './ui/icons';
 import TagManagement from './TagManagement';
+import { queryKeys } from '../lib/queryKeys';
 
 interface TagManagementModalProps {
   isOpen: boolean;
@@ -10,6 +13,15 @@ interface TagManagementModalProps {
 }
 
 export default function TagManagementModal({ isOpen, onClose }: TagManagementModalProps) {
+  const queryClient = useQueryClient();
+
+  // 弹窗打开时强制刷新标签列表
+  useEffect(() => {
+    if (isOpen) {
+      queryClient.refetchQueries({ queryKey: queryKeys.tags.list() });
+    }
+  }, [isOpen, queryClient]);
+
   if (!isOpen) return null;
 
   return (
