@@ -4,15 +4,16 @@ import Link from 'next/link'
 import { useTheme } from '../hooks/useTheme'
 import { usePathname } from 'next/navigation'
 import { motion } from 'motion/react'
-import { ImageIcon, HamburgerMenuIcon, LockClosedIcon, SunIcon, MoonIcon } from './ui/icons'
+import { ImageIcon, HamburgerMenuIcon, LockClosedIcon, SunIcon, MoonIcon, TagIcon } from './ui/icons'
 
 interface HeaderProps {
   onApiKeyClick: () => void
+  onTagManageClick?: () => void
   title?: string
   isKeyVerified?: boolean
 }
 
-export default function Header({ onApiKeyClick, title, isKeyVerified = false }: HeaderProps) {
+export default function Header({ onApiKeyClick, onTagManageClick, title, isKeyVerified = false }: HeaderProps) {
   const { isDarkMode, toggleTheme } = useTheme()
   const pathname = usePathname()
 
@@ -40,6 +41,12 @@ export default function Header({ onApiKeyClick, title, isKeyVerified = false }: 
           <Link href="/manage" className="btn-icon">
             <HamburgerMenuIcon className="h-6 w-6" />
           </Link>
+        )}
+
+        {pathname === '/manage' && onTagManageClick && (
+          <button onClick={onTagManageClick} className="btn-icon">
+            <TagIcon className="h-6 w-6" />
+          </button>
         )}
 
         <button onClick={onApiKeyClick} className="btn-icon relative">

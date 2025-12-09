@@ -17,16 +17,14 @@ import {
 } from "../types";
 import Header from "../components/Header";
 import ToastContainer from "../components/ToastContainer";
-import ManageTabs from "../components/ManageTabs";
-import TagManagement from "../components/TagManagement";
+import TagManagementModal from "../components/TagManagementModal";
 import { ImageIcon, Spinner } from "../components/ui/icons";
 import { useInfiniteImages, useDeleteImage } from "../hooks/useImages";
 
 export default function Manage() {
   useTheme();
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'images' | 'tags'>('images');
-  const prevTabRef = useRef<'images' | 'tags'>('images');
+  const [showTagModal, setShowTagModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ImageFile | null>(null);
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [filters, setFilters] = useState<ImageFilterState>({
@@ -135,13 +133,13 @@ export default function Manage() {
   // TanStack Query automatically refetches when filters change (via queryKey)
   // No need for manual fetch effect
 
-  // 当从标签管理切换回图片管理时，刷新图片列表（因为可能删除了标签和关联图片）
-  useEffect(() => {
-    if (prevTabRef.current === 'tags' && activeTab === 'images' && isKeyVerified) {
+  // 当关闭标签管理弹窗时刷新图片列表（因为可能删除了标签和关联图片）
+  const handleTagModalClose = () => {
+    setShowTagModal(false);
+    if (isKeyVerified) {
       refetch();
     }
-    prevTabRef.current = activeTab;
-  }, [activeTab, isKeyVerified, refetch]);
+  };
 
   const handleFilterChange = (
     format: string,
@@ -155,16 +153,14 @@ export default function Manage() {
     <div className="max-w-7xl mx-auto px-6 py-8">
       <Header
         onApiKeyClick={() => setShowApiKeyModal(true)}
+        onTagManageClick={() => setShowTagModal(true)}
         title="CattoPic"
         isKeyVerified={isKeyVerified}
       />
 
       <ToastContainer />
 
-      <ManageTabs activeTab={activeTab} onTabChange={setActiveTab} />
-
-      {activeTab === 'images' ? (
-        <>
+      <>
           {status && (
             <motion.div
               initial={{ opacity: 0, y: -20 }}
@@ -286,9 +282,11 @@ export default function Manage() {
             onDelete={handleDelete}
           />
         </>
-      ) : (
-        <TagManagement />
-      )}
+
+      <TagManagementModal
+        isOpen={showTagModal}
+        onClose={handleTagModalClose}
+      />
 
       <ApiKeyModal
         isOpen={showApiKeyModal}
