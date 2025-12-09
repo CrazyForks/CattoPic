@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Noto_Sans_SC } from "next/font/google";
 import "./globals.css";
+import { QueryProvider } from "./providers/QueryProvider";
 
 // Configure Inter font
 const inter = Inter({
@@ -50,7 +51,9 @@ export default function RootLayout({
           <div className="bubble"></div>
         </div>
 
-        {children}
+        <QueryProvider>
+          {children}
+        </QueryProvider>
 
         {/* 页脚 */}
         <div className="max-w-7xl mx-auto px-6 mt-8 text-center text-gray-600 dark:text-gray-400">

@@ -1,6 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+'use client';
+
+import { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../utils/request';
 import { Tag } from '../types';
+import { queryKeys } from '../lib/queryKeys';
 
 interface TagsResponse {
   success: boolean;
@@ -12,6 +16,7 @@ interface MutationResponse {
   message?: string;
   tag?: Tag;
   affectedImages?: number;
+  deletedImages?: number;
 }
 
 interface UseTagsReturn {
@@ -30,118 +35,166 @@ interface UseTagsReturn {
 }
 
 export function useTags(): UseTagsReturn {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
 
-  const fetchTags = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  // Query for fetching tags
+  const {
+    data,
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: queryKeys.tags.list(),
+    queryFn: async () => {
       const response = await api.get<TagsResponse>('/api/tags');
       if (response.success && response.tags) {
-        setTags(response.tags);
+        return response.tags;
       }
-    } catch (err) {
-      setError('获取标签列表失败');
-      console.error('获取标签失败:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      throw new Error('Failed to fetch tags');
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
 
-  const createTag = useCallback(async (name: string): Promise<boolean> => {
-    try {
+  const tags = data || [];
+
+  // Create tag mutation
+  const createMutation = useMutation({
+    mutationFn: async (name: string) => {
       const response = await api.post<MutationResponse>('/api/tags', { name });
-      if (response.success) {
-        // 本地更新：添加新标签到列表
-        if (response.tag) {
-          setTags(prev => [...prev, response.tag!]);
-        } else {
-          // 如果没有返回标签数据，添加一个默认结构
-          setTags(prev => [...prev, { name, count: 0 }]);
-        }
-        return true;
+      if (!response.success) {
+        throw new Error('Failed to create tag');
       }
-      return false;
-    } catch {
-      return false;
-    }
-  }, []);
+      return response;
+    },
+    onSuccess: (response, name) => {
+      // Optimistic update
+      queryClient.setQueryData<Tag[]>(queryKeys.tags.list(), (old) => {
+        if (!old) return [{ name, count: 0 }];
+        return [...old, response.tag || { name, count: 0 }];
+      });
+    },
+  });
 
-  const renameTag = useCallback(async (oldName: string, newName: string): Promise<boolean> => {
-    try {
+  // Rename tag mutation
+  const renameMutation = useMutation({
+    mutationFn: async ({ oldName, newName }: { oldName: string; newName: string }) => {
       const response = await api.put<MutationResponse>(
         `/api/tags/${encodeURIComponent(oldName)}`,
         { newName }
       );
-      if (response.success) {
-        // 本地更新：重命名标签
-        setTags(prev => prev.map(tag =>
-          tag.name === oldName ? { ...tag, name: newName } : tag
-        ));
-        // 更新选中状态
-        setSelectedTags(prev => {
-          if (prev.has(oldName)) {
-            const next = new Set(prev);
-            next.delete(oldName);
-            next.add(newName);
-            return next;
-          }
-          return prev;
-        });
-        return true;
+      if (!response.success) {
+        throw new Error('Failed to rename tag');
       }
-      return false;
-    } catch {
-      return false;
-    }
-  }, []);
+      return { oldName, newName, response };
+    },
+    onSuccess: ({ oldName, newName }) => {
+      // Optimistic update
+      queryClient.setQueryData<Tag[]>(queryKeys.tags.list(), (old) => {
+        if (!old) return old;
+        return old.map((tag) =>
+          tag.name === oldName ? { ...tag, name: newName } : tag
+        );
+      });
+      // Update selection
+      setSelectedTags((prev) => {
+        if (prev.has(oldName)) {
+          const next = new Set(prev);
+          next.delete(oldName);
+          next.add(newName);
+          return next;
+        }
+        return prev;
+      });
+      // Invalidate image lists as tag names changed
+      queryClient.invalidateQueries({ queryKey: queryKeys.images.lists() });
+    },
+  });
 
-  const deleteTag = useCallback(async (name: string): Promise<boolean> => {
-    try {
+  // Delete tag mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (name: string) => {
       const response = await api.delete<MutationResponse>(
         `/api/tags/${encodeURIComponent(name)}`
       );
-      if (response.success) {
-        // 本地更新：删除标签
-        setTags(prev => prev.filter(tag => tag.name !== name));
-        setSelectedTags(prev => {
-          const next = new Set(prev);
-          next.delete(name);
-          return next;
-        });
-        return true;
+      if (!response.success) {
+        throw new Error('Failed to delete tag');
       }
-      return false;
-    } catch {
-      return false;
-    }
-  }, []);
+      return name;
+    },
+    onSuccess: (name) => {
+      // Optimistic update
+      queryClient.setQueryData<Tag[]>(queryKeys.tags.list(), (old) => {
+        if (!old) return old;
+        return old.filter((tag) => tag.name !== name);
+      });
+      // Update selection
+      setSelectedTags((prev) => {
+        const next = new Set(prev);
+        next.delete(name);
+        return next;
+      });
+      // Invalidate image lists as images may have been deleted
+      queryClient.invalidateQueries({ queryKey: queryKeys.images.lists() });
+    },
+  });
 
-  const deleteTags = useCallback(async (names: string[]): Promise<boolean> => {
-    try {
-      const results = await Promise.all(
-        names.map(name =>
-          api.delete<MutationResponse>(`/api/tags/${encodeURIComponent(name)}`)
-        )
-      );
-      const allSuccess = results.every(r => r.success);
-      if (allSuccess) {
-        // 本地更新：批量删除标签
-        const namesSet = new Set(names);
-        setTags(prev => prev.filter(tag => !namesSet.has(tag.name)));
-        setSelectedTags(new Set());
+  // Wrapper functions to maintain compatible interface
+  const fetchTags = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  const createTag = useCallback(
+    async (name: string): Promise<boolean> => {
+      try {
+        await createMutation.mutateAsync(name);
+        return true;
+      } catch {
+        return false;
       }
-      return allSuccess;
-    } catch {
-      return false;
-    }
-  }, []);
+    },
+    [createMutation]
+  );
+
+  const renameTag = useCallback(
+    async (oldName: string, newName: string): Promise<boolean> => {
+      try {
+        await renameMutation.mutateAsync({ oldName, newName });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [renameMutation]
+  );
+
+  const deleteTag = useCallback(
+    async (name: string): Promise<boolean> => {
+      try {
+        await deleteMutation.mutateAsync(name);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [deleteMutation]
+  );
+
+  const deleteTags = useCallback(
+    async (names: string[]): Promise<boolean> => {
+      try {
+        await Promise.all(names.map((name) => deleteMutation.mutateAsync(name)));
+        setSelectedTags(new Set());
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [deleteMutation]
+  );
 
   const toggleTagSelection = useCallback((name: string) => {
-    setSelectedTags(prev => {
+    setSelectedTags((prev) => {
       const next = new Set(prev);
       if (next.has(name)) {
         next.delete(name);
@@ -153,21 +206,17 @@ export function useTags(): UseTagsReturn {
   }, []);
 
   const selectAllTags = useCallback(() => {
-    setSelectedTags(new Set(tags.map(t => t.name)));
+    setSelectedTags(new Set(tags.map((t) => t.name)));
   }, [tags]);
 
   const clearSelection = useCallback(() => {
     setSelectedTags(new Set());
   }, []);
 
-  useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
-
   return {
     tags,
     isLoading,
-    error,
+    error: queryError ? '获取标签列表失败' : null,
     selectedTags,
     fetchTags,
     createTag,

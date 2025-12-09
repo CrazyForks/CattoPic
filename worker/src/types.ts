@@ -53,6 +53,7 @@ export interface CompressionResult {
 export interface Env {
   R2_BUCKET: R2Bucket;
   DB: D1Database;
+  CACHE_KV: KVNamespace;
   ENVIRONMENT: string;
   IMAGES?: ImagesBinding;
 }

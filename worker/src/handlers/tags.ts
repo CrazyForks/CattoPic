@@ -2,16 +2,31 @@ import type { Context } from 'hono';
 import type { Env } from '../types';
 import { MetadataService } from '../services/metadata';
 import { StorageService } from '../services/storage';
+import { CacheService, CacheKeys, CACHE_TTL } from '../services/cache';
 import { successResponse, errorResponse } from '../utils/response';
 import { sanitizeTagName } from '../utils/validation';
 
 // GET /api/tags - Get all tags
 export async function tagsHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
   try {
+    const cache = new CacheService(c.env.CACHE_KV);
+    const cacheKey = CacheKeys.tagsList();
+
+    // Try to get from cache
+    const cached = await cache.get<ReturnType<typeof successResponse>>(cacheKey);
+    if (cached) {
+      return successResponse(cached);
+    }
+
     const metadata = new MetadataService(c.env.DB);
     const tags = await metadata.getAllTags();
 
-    return successResponse({ tags });
+    const responseData = { tags };
+
+    // Store in cache
+    await cache.set(cacheKey, responseData, CACHE_TTL.TAGS_LIST);
+
+    return successResponse(responseData);
 
   } catch (err) {
     console.error('Tags handler error:', err);
@@ -31,6 +46,10 @@ export async function createTagHandler(c: Context<{ Bindings: Env }>): Promise<R
 
     const metadata = new MetadataService(c.env.DB);
     await metadata.createTag(name);
+
+    // Invalidate tags cache
+    const cache = new CacheService(c.env.CACHE_KV);
+    await cache.invalidateTagsList();
 
     return successResponse({
       tag: { name, count: 0 }
@@ -59,6 +78,10 @@ export async function renameTagHandler(c: Context<{ Bindings: Env }>): Promise<R
 
     const metadata = new MetadataService(c.env.DB);
     const affectedCount = await metadata.renameTag(oldName, newName);
+
+    // Invalidate caches (tag rename affects image list filtering)
+    const cache = new CacheService(c.env.CACHE_KV);
+    await cache.invalidateAfterTagChange();
 
     // Get updated count
     const tags = await metadata.getAllTags();
@@ -101,6 +124,10 @@ export async function deleteTagHandler(c: Context<{ Bindings: Env }>): Promise<R
     // Delete tag and associated images from database
     const { deletedImages } = await metadata.deleteTagWithImages(name);
 
+    // Invalidate caches
+    const cache = new CacheService(c.env.CACHE_KV);
+    await cache.invalidateAfterTagChange();
+
     return successResponse({
       message: '标签及关联图片已删除',
       deletedImages
@@ -131,6 +158,10 @@ export async function batchTagsHandler(c: Context<{ Bindings: Env }>): Promise<R
 
     const metadata = new MetadataService(c.env.DB);
     const updatedCount = await metadata.batchUpdateTags(imageIds, sanitizedAddTags, sanitizedRemoveTags);
+
+    // Invalidate caches
+    const cache = new CacheService(c.env.CACHE_KV);
+    await cache.invalidateAfterTagChange();
 
     return successResponse({ updatedCount });
 

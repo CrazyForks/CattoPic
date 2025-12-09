@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import type { Env } from '../types';
 import { StorageService } from '../services/storage';
 import { MetadataService } from '../services/metadata';
+import { CacheService, CacheKeys, CACHE_TTL } from '../services/cache';
 import { successResponse, errorResponse, notFoundResponse } from '../utils/response';
 import { parseNumber, validateOrientation, parseTags, isValidUUID } from '../utils/validation';
 
@@ -13,6 +14,15 @@ export async function imagesHandler(c: Context<{ Bindings: Env }>): Promise<Resp
     const limit = parseNumber(url.searchParams.get('limit'), 12);
     const tag = url.searchParams.get('tag') || undefined;
     const orientation = validateOrientation(url.searchParams.get('orientation'));
+
+    const cache = new CacheService(c.env.CACHE_KV);
+    const cacheKey = CacheKeys.imagesList(page, limit, tag, orientation);
+
+    // Try to get from cache
+    const cached = await cache.get<ReturnType<typeof successResponse>>(cacheKey);
+    if (cached) {
+      return successResponse(cached);
+    }
 
     const metadata = new MetadataService(c.env.DB);
     const { images, total } = await metadata.getImages({ page, limit, tag, orientation });
@@ -30,13 +40,18 @@ export async function imagesHandler(c: Context<{ Bindings: Env }>): Promise<Resp
       }
     }));
 
-    return successResponse({
+    const responseData = {
       images: imagesWithUrls,
       page,
       limit,
       total,
       totalPages: Math.ceil(total / limit)
-    });
+    };
+
+    // Store in cache
+    await cache.set(cacheKey, responseData, CACHE_TTL.IMAGES_LIST);
+
+    return successResponse(responseData);
 
   } catch (err) {
     console.error('Images handler error:', err);
@@ -53,6 +68,15 @@ export async function imageDetailHandler(c: Context<{ Bindings: Env }>): Promise
       return errorResponse('无效的图片ID');
     }
 
+    const cache = new CacheService(c.env.CACHE_KV);
+    const cacheKey = CacheKeys.imageDetail(id);
+
+    // Try to get from cache
+    const cached = await cache.get<ReturnType<typeof successResponse>>(cacheKey);
+    if (cached) {
+      return successResponse(cached);
+    }
+
     const metadata = new MetadataService(c.env.DB);
     const image = await metadata.getImage(id);
 
@@ -63,7 +87,7 @@ export async function imageDetailHandler(c: Context<{ Bindings: Env }>): Promise
     const workerUrl = new URL(c.req.url).origin;
     const baseUrl = `${workerUrl}/r2`;
 
-    return successResponse({
+    const responseData = {
       image: {
         ...image,
         urls: {
@@ -72,7 +96,12 @@ export async function imageDetailHandler(c: Context<{ Bindings: Env }>): Promise
           avif: image.paths.avif ? `${baseUrl}/${image.paths.avif}` : ''
         }
       }
-    });
+    };
+
+    // Store in cache
+    await cache.set(cacheKey, responseData, CACHE_TTL.IMAGE_DETAIL);
+
+    return successResponse(responseData);
 
   } catch (err) {
     console.error('Image detail handler error:', err);
@@ -112,6 +141,14 @@ export async function updateImageHandler(c: Context<{ Bindings: Env }>): Promise
 
     if (!updated) {
       return notFoundResponse('图片不存在');
+    }
+
+    // Invalidate caches
+    const cache = new CacheService(c.env.CACHE_KV);
+    await cache.invalidateImageDetail(id);
+    // If tags changed, invalidate tags list cache
+    if (body.tags !== undefined) {
+      await cache.invalidateTagsList();
     }
 
     const workerUrl = new URL(c.req.url).origin;
@@ -161,6 +198,10 @@ export async function deleteImageHandler(c: Context<{ Bindings: Env }>): Promise
 
     // Delete metadata
     await metadataService.deleteImage(id);
+
+    // Invalidate caches
+    const cache = new CacheService(c.env.CACHE_KV);
+    await cache.invalidateAfterImageChange(id);
 
     return successResponse({ message: '图片已删除' });
 

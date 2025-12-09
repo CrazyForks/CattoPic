@@ -13,6 +13,7 @@ import PreviewSidebar from './components/upload/PreviewSidebar'
 import CompressionSettings from './components/upload/CompressionSettings'
 import { motion } from 'motion/react'
 import { ImageIcon, PlusCircledIcon } from './components/ui/icons'
+import { useInvalidateImages } from './hooks/useImages'
 
 const DEFAULT_MAX_UPLOAD_COUNT = 20;
 
@@ -29,6 +30,9 @@ export default function Home() {
   const [fileDetails, setFileDetails] = useState<{ id: string, file: File }[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [expiryMinutes, setExpiryMinutes] = useState<number>(0)
+
+  // TanStack Query cache invalidation hook
+  const invalidateImages = useInvalidateImages()
 
   // 压缩设置状态
   const [compressionQuality, setCompressionQuality] = useState(90)
@@ -183,7 +187,10 @@ export default function Home() {
         type: errorCount === 0 ? 'success' : 'warning',
         message: `上传完成：共${totalCount}张，${successCount}张成功，${errorCount}张失败`
       })
-      
+
+      // Invalidate image list cache so manage page shows new images immediately
+      invalidateImages()
+
       // 重置文件详情，清空上传队列
       setFileDetails([])
     } catch (error) {

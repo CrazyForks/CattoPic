@@ -5,7 +5,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from 'motion/react';
 import Masonry from "react-masonry-css";
 import { getApiKey, validateApiKey, setApiKey } from "../utils/auth";
-import { api } from "../utils/request";
 import ApiKeyModal from "../components/ApiKeyModal";
 import ImageFilters from "../components/ImageFilters";
 import ImageCard from "../components/ImageCard";
@@ -13,7 +12,6 @@ import ImageModal from "../components/ImageModal";
 import { useTheme } from "../hooks/useTheme";
 import {
   ImageFile,
-  ImageListResponse,
   StatusMessage,
   ImageFilterState,
 } from "../types";
@@ -22,19 +20,15 @@ import ToastContainer from "../components/ToastContainer";
 import ManageTabs from "../components/ManageTabs";
 import TagManagement from "../components/TagManagement";
 import { ImageIcon, Spinner } from "../components/ui/icons";
+import { useInfiniteImages, useDeleteImage } from "../hooks/useImages";
 
 export default function Manage() {
   useTheme();
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'images' | 'tags'>('images');
   const prevTabRef = useRef<'images' | 'tags'>('images');
-  const [images, setImages] = useState<ImageFile[]>([]);
   const [selectedImage, setSelectedImage] = useState<ImageFile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<StatusMessage | null>(null);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [totalImages, setTotalImages] = useState(0);
   const [filters, setFilters] = useState<ImageFilterState>({
     format: "webp",
     orientation: "all",
@@ -42,50 +36,48 @@ export default function Manage() {
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isKeyVerified, setIsKeyVerified] = useState(false);
-  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const observer = useRef<IntersectionObserver | null>(null);
-  const loadMoreImages = useCallback(async () => {
-    if (!hasMore || isFetchingMore) return;
 
-    try {
-      setIsFetchingMore(true);
-      const nextPage = page + 1;
+  // TanStack Query hooks
+  const {
+    images,
+    total: totalImages,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+    error: queryError,
+  } = useInfiniteImages({
+    tag: filters.tag || undefined,
+    orientation: filters.orientation === 'all' ? undefined : filters.orientation,
+    limit: 24,
+  });
 
-      const data = await api.get<ImageListResponse>("/api/images", {
-        page: nextPage.toString(),
-        limit: "24",
-        format: filters.format,
-        orientation: filters.orientation,
-        tag: filters.tag,
-      });
+  const deleteImageMutation = useDeleteImage();
 
-      setImages(prevImages => [...prevImages, ...data.images]);
-      setPage(nextPage);
-      setHasMore(data.page < data.totalPages);
-
-    } catch (error) {
-      console.error("加载更多图片失败:", error);
+  // Show query error as status
+  useEffect(() => {
+    if (queryError) {
       setStatus({
         type: "error",
-        message: "加载更多图片失败",
+        message: "加载图片列表失败",
       });
-    } finally {
-      setIsFetchingMore(false);
     }
-  }, [hasMore, isFetchingMore, page, filters]);
+  }, [queryError]);
 
   const lastImageElementRef = useCallback(
     (node: HTMLDivElement | null) => {
-      if (isLoading || isFetchingMore) return;
+      if (isLoading || isFetchingNextPage) return;
       if (observer.current) observer.current.disconnect();
       observer.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore) {
-          loadMoreImages();
+        if (entries[0].isIntersecting && hasNextPage) {
+          fetchNextPage();
         }
       });
       if (node) observer.current.observe(node);
     },
-    [isLoading, isFetchingMore, hasMore, loadMoreImages]
+    [isLoading, isFetchingNextPage, hasNextPage, fetchNextPage]
   );
 
   useEffect(() => {
@@ -114,7 +106,6 @@ export default function Manage() {
       }
 
       setIsKeyVerified(true);
-      fetchImages();
     } catch (error) {
       console.error("API Key验证失败:", error);
       setShowApiKeyModal(true);
@@ -126,60 +117,13 @@ export default function Manage() {
     }
   };
 
-  const fetchImages = async () => {
-    try {
-      setIsLoading(true);
-      setImages([]);
-      setPage(1);
-      const data = await api.get<ImageListResponse>("/api/images", {
-        page: "1",
-        limit: "24", 
-        format: filters.format,
-        orientation: filters.orientation,
-        tag: filters.tag,
-      });
-
-      setImages(data.images);
-      setHasMore(data.page < data.totalPages);
-      
-      if (data.total) {
-        setTotalImages(data.total);
-      }
-      setStatus(null);
-    } catch (error) {
-      console.error("加载图片列表失败:", error);
-      setStatus({
-        type: "error",
-        message: "加载图片列表失败",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleDelete = async (id: string) => {
     try {
-      const image = images.find((img) => img.id === id);
-      if (!image) return;
-
-      const response = await api.delete<{ success: boolean; message: string }>(
-        `/api/images/${image.id}`
-      );
-
-      if (response.success) {
-        // 本地更新：从列表中移除删除的图片
-        setImages(prev => prev.filter(img => img.id !== id));
-        setTotalImages(prev => Math.max(0, prev - 1));
-        setStatus({
-          type: "success",
-          message: response.message || "删除成功",
-        });
-      } else {
-        setStatus({
-          type: "error",
-          message: "删除失败",
-        });
-      }
+      await deleteImageMutation.mutateAsync(id);
+      setStatus({
+        type: "success",
+        message: "删除成功",
+      });
     } catch {
       setStatus({
         type: "error",
@@ -188,19 +132,16 @@ export default function Manage() {
     }
   };
 
-  useEffect(() => {
-    fetchImages();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  // TanStack Query automatically refetches when filters change (via queryKey)
+  // No need for manual fetch effect
 
   // 当从标签管理切换回图片管理时，刷新图片列表（因为可能删除了标签和关联图片）
   useEffect(() => {
     if (prevTabRef.current === 'tags' && activeTab === 'images' && isKeyVerified) {
-      fetchImages();
+      refetch();
     }
     prevTabRef.current = activeTab;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, isKeyVerified, refetch]);
 
   const handleFilterChange = (
     format: string,
@@ -313,13 +254,13 @@ export default function Manage() {
                       )}
                     </div>
                   </div>
-                  {isFetchingMore && (
+                  {isFetchingNextPage && (
                     <div className="flex justify-center items-center py-8">
                       <Spinner className="h-8 w-8 text-indigo-500" />
                       <span className="ml-2 text-indigo-500">加载更多图片...</span>
                     </div>
                   )}
-                  {!isLoading && !isFetchingMore && images.length > 0 && !hasMore && (
+                  {!isLoading && !isFetchingNextPage && images.length > 0 && !hasNextPage && (
                     <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                       已加载全部图片 ({totalImages}张)
                     </div>
@@ -356,7 +297,7 @@ export default function Manage() {
           setApiKey(apiKey);
           setIsKeyVerified(true);
           setShowApiKeyModal(false);
-          fetchImages();
+          // TanStack Query will automatically fetch when component mounts/remounts
         }}
       />
     </div>

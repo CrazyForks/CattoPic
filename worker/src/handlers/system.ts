@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import type { Env, Config } from '../types';
 import { StorageService } from '../services/storage';
 import { MetadataService } from '../services/metadata';
+import { CacheService, CacheKeys, CACHE_TTL } from '../services/cache';
 import { successResponse, errorResponse } from '../utils/response';
 
 // Default configuration
@@ -22,10 +23,21 @@ export async function validateApiKeyHandler(_c: Context<{ Bindings: Env }>): Pro
 // GET /api/config - Get configuration
 export async function configHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
   try {
+    const cache = new CacheService(c.env.CACHE_KV);
+    const cacheKey = CacheKeys.config();
+
+    // Try to get from cache
+    const cached = await cache.get<{ config: Config }>(cacheKey);
+    if (cached) {
+      return successResponse(cached);
+    }
+
     // Try to get custom config from D1
     const configResult = await c.env.DB.prepare(`
       SELECT key, value FROM config
     `).all<{ key: string; value: string }>();
+
+    let responseData: { config: Config };
 
     if (configResult.results && configResult.results.length > 0) {
       const config: Record<string, number | string | string[]> = { ...DEFAULT_CONFIG };
@@ -36,10 +48,15 @@ export async function configHandler(c: Context<{ Bindings: Env }>): Promise<Resp
           config[row.key] = row.value;
         }
       }
-      return successResponse({ config });
+      responseData = { config: config as unknown as Config };
+    } else {
+      responseData = { config: DEFAULT_CONFIG };
     }
 
-    return successResponse({ config: DEFAULT_CONFIG });
+    // Store in cache
+    await cache.set(cacheKey, responseData, CACHE_TTL.CONFIG);
+
+    return successResponse(responseData);
 
   } catch (err) {
     console.error('Config handler error:', err);

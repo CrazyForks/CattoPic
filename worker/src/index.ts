@@ -50,7 +50,7 @@ const authMiddleware = async (c: Context<{ Bindings: Env }>, next: () => Promise
 // Random image (public, no auth required)
 app.get('/api/random', randomHandler);
 
-// Serve R2 files (public)
+// Serve R2 files (public) with Cache API edge caching
 app.get('/r2/*', async (c) => {
   const path = c.req.path.replace('/r2/', '');
 
@@ -58,18 +58,43 @@ app.get('/r2/*', async (c) => {
     return c.json({ success: false, error: 'Path required' }, 400);
   }
 
+  // Use Cloudflare Cache API for edge caching
+  const cache = caches.default;
+  const cacheKey = new Request(c.req.url, c.req.raw);
+
+  // Check edge cache first
+  let response = await cache.match(cacheKey);
+  if (response) {
+    return response;
+  }
+
+  // Cache miss - fetch from R2
   const object = await c.env.R2_BUCKET.get(path);
 
   if (!object) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
 
+  // Check ETag for conditional requests
+  const etag = object.httpEtag;
+  const ifNoneMatch = c.req.header('If-None-Match');
+  if (ifNoneMatch && ifNoneMatch === etag) {
+    return new Response(null, { status: 304 });
+  }
+
+  // Build response with caching headers
   const headers = new Headers();
   headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
-  headers.set('Cache-Control', 'public, max-age=31536000');
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  headers.set('ETag', etag);
   headers.set('Access-Control-Allow-Origin', '*');
 
-  return new Response(object.body, { headers });
+  response = new Response(object.body, { headers });
+
+  // Store in edge cache (non-blocking)
+  c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+
+  return response;
 });
 
 // === Protected Routes ===

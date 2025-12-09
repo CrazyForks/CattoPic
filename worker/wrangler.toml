@@ -21,6 +21,11 @@ binding = 'DB'
 database_name = 'CattoPic-D1'
 database_id = 'cb07b667-2a42-4ca1-84ce-49d5114af009'
 
+# KV Namespace for caching
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "f04a33814498458a84085799828bc7d7"
+
 # Cron Triggers - cleanup expired images every hour
 [triggers]
 crons = ['0 * * * *']

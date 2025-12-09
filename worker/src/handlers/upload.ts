@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import type { Env, ImageMetadata, UploadResult } from '../types';
 import { StorageService } from '../services/storage';
 import { MetadataService } from '../services/metadata';
+import { CacheService } from '../services/cache';
 import { ImageProcessor } from '../services/imageProcessor';
 import { CompressionService, parseCompressionOptions } from '../services/compression';
 import { successResponse, errorResponse } from '../utils/response';
@@ -184,6 +185,13 @@ export async function uploadHandler(c: Context<{ Bindings: Env }>): Promise<Resp
           error: `Failed to upload ${file.name}`
         });
       }
+    }
+
+    // Invalidate image list cache after successful upload
+    const successCount = results.filter(r => r.status === 'success').length;
+    if (successCount > 0) {
+      const cache = new CacheService(c.env.CACHE_KV);
+      await cache.invalidateImagesList();
     }
 
     return successResponse({ results });
