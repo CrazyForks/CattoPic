@@ -12,7 +12,8 @@ if (fs.existsSync(parentEnvPath)) {
 }
 
 /** @type {boolean} */
-const isStaticExport = !process.env.NEXT_PUBLIC_API_URL;
+// Always use static export for Cloudflare Pages deployment
+const isStaticExport = true;
 
 const parseRemotePatterns = (patterns) => {
   if (!patterns || isStaticExport) {
