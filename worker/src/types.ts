@@ -49,6 +49,9 @@ export interface CompressionResult {
   isAnimated: boolean;
 }
 
+// Import Queue message types
+import type { QueueMessage } from './types/queue';
+
 // Cloudflare Worker bindings
 export interface Env {
   R2_BUCKET: R2Bucket;
@@ -57,6 +60,7 @@ export interface Env {
   ENVIRONMENT: string;
   R2_PUBLIC_URL: string;
   IMAGES?: ImagesBinding;
+  DELETE_QUEUE: Queue<QueueMessage>;
 }
 
 // D1 row type for images table

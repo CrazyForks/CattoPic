@@ -1,7 +1,6 @@
 import type { Context } from 'hono';
 import type { Env } from '../types';
 import { MetadataService } from '../services/metadata';
-import { StorageService } from '../services/storage';
 import { CacheService, CacheKeys, CACHE_TTL } from '../services/cache';
 import { successResponse, errorResponse } from '../utils/response';
 import { sanitizeTagName } from '../utils/validation';
@@ -99,35 +98,39 @@ export async function renameTagHandler(c: Context<{ Bindings: Env }>): Promise<R
 }
 
 // DELETE /api/tags/:name - Delete tag and associated images
+// D1 删除和缓存失效是同步的，R2 文件删除通过 Queue 异步处理
 export async function deleteTagHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
   try {
     const name = decodeURIComponent(c.req.param('name'));
 
     const metadata = new MetadataService(c.env.DB);
-    const storage = new StorageService(c.env.R2_BUCKET);
 
-    // Get all images with this tag first (to get their R2 paths)
+    // 1. 获取关联图片（一次查询，保存路径供队列使用）
     const images = await metadata.getImagesByTag(name);
+    const imagePaths = images.map(img => ({
+      id: img.id,
+      paths: {
+        original: img.paths.original,
+        webp: img.paths.webp || undefined,
+        avif: img.paths.avif || undefined,
+      },
+    }));
 
-    // Collect all R2 keys to delete
-    const keysToDelete: string[] = [];
-    for (const image of images) {
-      keysToDelete.push(image.paths.original);
-      if (image.paths.webp) keysToDelete.push(image.paths.webp);
-      if (image.paths.avif) keysToDelete.push(image.paths.avif);
-    }
-
-    // Delete files from R2
-    if (keysToDelete.length > 0) {
-      await storage.deleteMany(keysToDelete);
-    }
-
-    // Delete tag and associated images from database
+    // 2. 同步删除 D1 中的标签和图片元数据
     const { deletedImages } = await metadata.deleteTagWithImages(name);
 
-    // Invalidate caches
+    // 3. 同步失效 KV 缓存
     const cache = new CacheService(c.env.CACHE_KV);
     await cache.invalidateAfterTagChange();
+
+    // 4. 异步删除 R2 文件（通过 Queue 后台处理）
+    if (imagePaths.length > 0) {
+      await c.env.DELETE_QUEUE.send({
+        type: 'delete_tag_images',
+        tagName: name,
+        imagePaths: imagePaths,
+      });
+    }
 
     return successResponse({
       message: '标签及关联图片已删除',

@@ -255,27 +255,19 @@ export class MetadataService {
       params.push(filters.tags!.length);
     }
 
-    // Step 1: Get count of matching images (more efficient than ORDER BY RANDOM())
-    const countResult = await this.db.prepare(`
-      SELECT COUNT(*) as count FROM (
-        SELECT DISTINCT i.id FROM images i ${joinClause} ${whereClause} ${groupClause}
-      )
-    `).bind(...params).first<{ count: number }>();
-
-    const count = countResult?.count || 0;
-    if (count === 0) return null;
-
-    // Step 2: Generate random offset and fetch single record
-    const randomOffset = Math.floor(Math.random() * count);
-
+    // 优化：使用 ORDER BY RANDOM() 一次查询完成，避免 3 次 DB 往返
+    // 对于中小规模数据集（< 10000），这比 COUNT + OFFSET 方案更高效
     const result = await this.db.prepare(`
-      SELECT DISTINCT i.id FROM images i ${joinClause} ${whereClause} ${groupClause}
-      ORDER BY i.upload_time DESC
-      LIMIT 1 OFFSET ?
-    `).bind(...params, randomOffset).first<{ id: string }>();
+      SELECT i.* FROM images i ${joinClause} ${whereClause} ${groupClause}
+      ORDER BY RANDOM()
+      LIMIT 1
+    `).bind(...params).first<ImageRow>();
 
     if (!result) return null;
-    return this.getImage(result.id);
+
+    // 使用 enrichWithTags 获取标签（单次额外查询）
+    const enriched = await this.enrichWithTags([result]);
+    return enriched[0] || null;
   }
 
   // === Tag Management ===

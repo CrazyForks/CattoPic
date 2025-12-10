@@ -1,6 +1,5 @@
 import type { Context } from 'hono';
 import type { Env } from '../types';
-import { StorageService } from '../services/storage';
 import { MetadataService } from '../services/metadata';
 import { CacheService, CacheKeys, CACHE_TTL } from '../services/cache';
 import { successResponse, errorResponse, notFoundResponse } from '../utils/response';
@@ -180,6 +179,7 @@ export async function updateImageHandler(c: Context<{ Bindings: Env }>): Promise
 }
 
 // DELETE /api/images/:id - Delete image
+// D1 删除和缓存失效是同步的，R2 文件删除通过 Queue 异步处理
 export async function deleteImageHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
   try {
     const id = c.req.param('id');
@@ -195,24 +195,26 @@ export async function deleteImageHandler(c: Context<{ Bindings: Env }>): Promise
       return notFoundResponse('图片不存在');
     }
 
-    // Delete files from R2
-    const storage = new StorageService(c.env.R2_BUCKET);
-    const keysToDelete = [image.paths.original];
-
-    if (image.paths.webp) keysToDelete.push(image.paths.webp);
-    if (image.paths.avif) keysToDelete.push(image.paths.avif);
-
-    await storage.deleteMany(keysToDelete);
-
-    // Delete metadata
+    // 1. 同步删除 D1 元数据（保证刷新后不会再看到已删除的图片）
     await metadataService.deleteImage(id);
 
-    // Invalidate caches (包括标签缓存，因为删除图片会影响标签计数)
+    // 2. 同步失效 KV 缓存（保证其他用户也不会看到已删除的图片）
     const cache = new CacheService(c.env.CACHE_KV);
     await Promise.all([
       cache.invalidateAfterImageChange(id),
       cache.invalidateTagsList(),
     ]);
+
+    // 3. 异步删除 R2 文件（最耗时的操作，通过 Queue 后台处理）
+    await c.env.DELETE_QUEUE.send({
+      type: 'delete_image',
+      imageId: id,
+      paths: {
+        original: image.paths.original,
+        webp: image.paths.webp || undefined,
+        avif: image.paths.avif || undefined,
+      },
+    });
 
     return successResponse({ message: '图片已删除' });
 
