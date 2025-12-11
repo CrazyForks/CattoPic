@@ -12,8 +12,8 @@ if (fs.existsSync(parentEnvPath)) {
 }
 
 /** @type {boolean} */
-// Always use static export for Cloudflare Pages deployment
-const isStaticExport = true;
+// Set to false to enable server mode with image optimization (requires Vercel)
+const isStaticExport = false;
 
 const parseRemotePatterns = (patterns) => {
   if (!patterns || isStaticExport) {
