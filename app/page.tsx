@@ -320,6 +320,14 @@ export default function Home() {
         expiryMinutes={expiryMinutes}
         setExpiryMinutes={setExpiryMinutes}
         onTagsChange={handleTagsChange}
+        onZipUploadComplete={() => {
+          // ZIP上传完成后刷新图片缓存
+          invalidateImages()
+          setStatus({
+            type: 'success',
+            message: 'ZIP批量上传完成'
+          })
+        }}
       />
 
       {/* 压缩设置 */}
