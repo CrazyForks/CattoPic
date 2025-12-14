@@ -5,7 +5,7 @@ import { api } from "../utils/request";
 import { ChevronDownIcon, MagnifyingGlassIcon, MixerHorizontalIcon } from "./ui/icons";
 
 export default function ImageFilters({ onFilterChange }: ImageFiltersProps) {
-  const [format, setFormat] = useState("webp");
+  const [format, setFormat] = useState("all");
   const [orientation, setOrientation] = useState("all");
   const [tag, setTag] = useState("");
   const [availableTags, setAvailableTags] = useState<string[]>([]);
@@ -23,8 +23,11 @@ export default function ImageFilters({ onFilterChange }: ImageFiltersProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   const formatOptions = useMemo(() => [
-    { value: "webp", label: "图片" },
-    { value: "gif", label: "GIF" }
+    { value: "all", label: "全部" },
+    { value: "webp", label: "WebP" },
+    { value: "avif", label: "AVIF" },
+    { value: "original", label: "仅原图" },
+    { value: "gif", label: "GIF" },
   ], []);
 
   const orientationOptions = useMemo(() => [

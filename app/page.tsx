@@ -131,16 +131,36 @@ export default function Home() {
     for (const [queryKey, data] of cachedLists) {
       if (!Array.isArray(queryKey) || queryKey.length < 3) continue
 
-      const filters = queryKey[2] as { page?: number; tag?: string; orientation?: string; limit?: number } | undefined
+      const filters = queryKey[2] as { page?: number; tag?: string; orientation?: string; format?: string; limit?: number } | undefined
       const tag = typeof filters?.tag === 'string' ? filters.tag : ''
       const orientation = typeof filters?.orientation === 'string' ? filters.orientation : ''
+      const format = typeof filters?.format === 'string' ? filters.format : 'all'
       const limit = typeof filters?.limit === 'number' ? filters.limit : 24
       const page = typeof filters?.page === 'number' ? filters.page : undefined
+
+      const matchesFormat = (img: ImageFile) => {
+        const f = (format || 'all').toLowerCase()
+        const urls = img.urls || { original: '', webp: '', avif: '' }
+        switch (f) {
+          case 'all':
+            return true
+          case 'gif':
+            return (img.format || '').toLowerCase() === 'gif'
+          case 'webp':
+            return !!urls.webp
+          case 'avif':
+            return !!urls.avif
+          case 'original':
+            return !!urls.original && !urls.webp && !urls.avif
+          default:
+            return true
+        }
+      }
 
       const candidates = uploadedImages.filter((img) => {
         const tagOk = !tag || img.tags.includes(tag)
         const orientationOk = !orientation || img.orientation === orientation
-        return tagOk && orientationOk
+        return tagOk && orientationOk && matchesFormat(img)
       })
       if (candidates.length === 0) continue
 

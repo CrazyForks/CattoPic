@@ -30,13 +30,14 @@ export default function Manage() {
   const [selectedImage, setSelectedImage] = useState<ImageFile | null>(null);
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [filters, setFilters] = useState<ImageFilterState>({
-    format: "webp",
+    format: "all",
     orientation: "all",
     tag: "",
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isKeyVerified, setIsKeyVerified] = useState(false);
   const observer = useRef<IntersectionObserver | null>(null);
+  const autoFetchAttemptsRef = useRef(0);
 
   // TanStack Query hooks
   const {
@@ -51,6 +52,7 @@ export default function Manage() {
   } = useInfiniteImages({
     tag: filters.tag || undefined,
     orientation: filters.orientation === 'all' ? undefined : filters.orientation,
+    format: filters.format,
     limit: 24,
   });
 
@@ -79,6 +81,20 @@ export default function Manage() {
     },
     [isLoading, isFetchingNextPage, hasNextPage, fetchNextPage]
   );
+
+  // If current filters result in 0 items but there are more pages, auto-fetch a few pages to find matches.
+  useEffect(() => {
+    autoFetchAttemptsRef.current = 0;
+  }, [filters.format, filters.orientation, filters.tag]);
+
+  useEffect(() => {
+    if (isLoading || isFetchingNextPage) return;
+    if (!hasNextPage) return;
+    if (images.length > 0) return;
+    if (autoFetchAttemptsRef.current >= 5) return;
+    autoFetchAttemptsRef.current += 1;
+    void fetchNextPage();
+  }, [images.length, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage]);
 
   useEffect(() => {
     checkApiKey();
@@ -149,6 +165,8 @@ export default function Manage() {
     setFilters({ format, orientation, tag });
   };
 
+  const prefetchIndex = Math.max(images.length - 5, 0);
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
       <Header
@@ -216,7 +234,7 @@ export default function Manage() {
                                 duration: 0.3,
                                 delay: (index % 24) * 0.05,
                               }}
-                              ref={index === images.length - 5 ? lastImageElementRef : null}
+                              ref={index === prefetchIndex ? lastImageElementRef : null}
                             >
                               <ImageCard
                                 image={image}
@@ -236,7 +254,7 @@ export default function Manage() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ duration: 0.3, delay: (index % 24) * 0.05 }}
-                            ref={index === images.length - 5 ? lastImageElementRef : null}
+                            ref={index === prefetchIndex ? lastImageElementRef : null}
                           >
                             <ImageCard
                               image={image}
