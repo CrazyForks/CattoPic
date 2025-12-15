@@ -11,7 +11,7 @@ import TagSelector from './upload/TagSelector'
 import { api } from '../utils/request'
 import { UploadIcon, ExclamationTriangleIcon, ImageIcon, Spinner } from '../components/ui/icons'
 import { formatFileSize } from '../utils/imageUtils'
-import { useZipUpload, ZipUploadPhase } from '../hooks/useZipUpload'
+import { useZipUpload } from '../hooks/useZipUpload'
 import type { UploadResult } from '../types'
 
 const MAX_FILE_SIZE = 70 * 1024 * 1024; // 70MB
@@ -39,7 +39,7 @@ interface UploadSectionProps {
 export default function UploadSection({
   onUpload,
   isUploading,
-  maxUploadCount = 20,
+  maxUploadCount = 50,
   onFilesSelected,
   onTogglePreview,
   isPreviewOpen,

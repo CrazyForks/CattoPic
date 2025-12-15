@@ -4,7 +4,6 @@ import { useState, useCallback, useRef } from 'react'
 import {
   ZipAnalysisResult,
   ExtractionProgress,
-  ExtractedImage,
   analyzeZipFile,
   extractImagesBatch,
 } from '../utils/zipProcessor'
@@ -173,14 +172,14 @@ export function useZipUpload(): ZipUploadState & ZipUploadActions {
           // 并发上传当前批次
           const results = await concurrentUpload({
             files: batch.map((img) => ({ id: img.id, file: img.file })),
-            concurrency: options.outputFormat === 'webp' ? 5 : 3,
+            concurrency: 5,
             tags: options.tags,
             expiryMinutes: options.expiryMinutes,
             quality: options.quality,
             maxWidth: options.maxWidth,
             preserveAnimation: options.preserveAnimation,
             outputFormat: options.outputFormat,
-            onFileStatusChange: (fileId: string, status: FileUploadStatus, result?: UploadResult) => {
+            onFileStatusChange: (fileId: string, status: FileUploadStatus) => {
               if (status === 'success') {
                 completedCount++
               } else if (status === 'error') {

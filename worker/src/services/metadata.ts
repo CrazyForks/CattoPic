@@ -445,7 +445,6 @@ export class MetadataService {
       const addStatements: D1PreparedStatement[] = [];
       for (const tag of addTags) {
         // For each tag, insert associations for all imageIds at once
-        const imgPlaceholders = imageIds.map(() => '?').join(',');
         addStatements.push(
           this.db.prepare(`
             INSERT OR IGNORE INTO image_tags (image_id, tag_id)

@@ -2,7 +2,6 @@ import JSZip from 'jszip'
 
 // 支持的图片格式
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif']
-const MAX_FILE_SIZE = 70 * 1024 * 1024 // 70MB
 
 export interface ZipImageEntry {
   path: string

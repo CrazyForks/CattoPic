@@ -84,6 +84,7 @@ const ImageSidebar = React.memo(function ImageSidebar({
 
   const estimateSize = useCallback(() => columnWidth, [columnWidth]);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const gridVirtualizer = useVirtualizer({
     count: displayResults.length,
     getItemKey,

@@ -26,6 +26,7 @@
 - UI 列表/网格统一使用 `/cdn-cgi/image/width=...` 请求缩略图，降低带宽与解码开销。
 - `/api/images` 新增 `format` 后端筛选（`all|gif|webp|avif|original`），减少大图库场景下前端筛选与处理开销。
 - 管理页单页加载数量从 24 提升到 60，减少滚动过程中的请求次数与抖动。
+- 默认 `maxUploadCount` 调整为 50，并发上传数量统一调整为 5（含 AVIF）。
 
 ### 废弃
 

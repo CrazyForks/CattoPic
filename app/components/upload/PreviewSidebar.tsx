@@ -96,6 +96,7 @@ export default function PreviewSidebar({
   const estimateSize = useCallback(() => 72, [])
   const removeFile = useCallback((id: string) => onRemoveFile(id), [onRemoveFile])
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const listVirtualizer = useVirtualizer({
     count: files.length,
     getScrollElement,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../utils/request';
 import { getApiKey } from '../utils/auth';
@@ -64,7 +64,7 @@ export function useTags(): UseTagsReturn {
     refetchOnMount: true, // 组件挂载时刷新
   });
 
-  const tags = data || [];
+  const tags = useMemo(() => data ?? [], [data]);
 
   // Create tag mutation
   const createMutation = useMutation({

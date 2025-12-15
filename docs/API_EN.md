@@ -775,8 +775,8 @@ GET /api/config
 {
   "success": true,
   "config": {
-    "maxUploadCount": 20,
-    "maxFileSize": 10485760,
+    "maxUploadCount": 50,
+    "maxFileSize": 73400320,
     "supportedFormats": ["jpeg", "jpg", "png", "gif", "webp", "avif"],
     "imageQuality": 80
   }

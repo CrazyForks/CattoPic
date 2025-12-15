@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Request resized thumbnail URLs via `/cdn-cgi/image/width=...` for UI grids to reduce bandwidth/decode cost.
 - Add server-side `format` filtering to `/api/images` (`all|gif|webp|avif|original`) to reduce client-side work for large libraries.
 - Increase Manage page page size from 24 to 60 to reduce request churn while scrolling.
+- Increase default `maxUploadCount` to 50 and use concurrency=5 for uploads (including AVIF).
 
 ### Deprecated
 

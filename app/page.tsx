@@ -291,9 +291,7 @@ export default function Home() {
       // 使用并发上传（5个同时）
       const results = await concurrentUpload({
         files: fileDetails,
-        // AVIF transforms are more resource-intensive and can fail under bursty load.
-        // Slightly reduce per-client concurrency when AVIF is requested to improve success rate.
-        concurrency: outputFormat === 'webp' ? 5 : 3,
+        concurrency: 5,
         tags: selectedTags,
         expiryMinutes,
         quality: compressionQuality,

@@ -83,7 +83,7 @@ app.get('/api/config', authMiddleware, configHandler);
 app.post('/api/cleanup', authMiddleware, cleanupHandler);
 
 // 404 handler - ensure CORS headers are included
-app.notFound((c) => {
+app.notFound(() => {
   return new Response(
     JSON.stringify({ success: false, error: 'Not found' }),
     {
@@ -99,7 +99,7 @@ app.notFound((c) => {
 });
 
 // Error handler - ensure CORS headers are included
-app.onError((err, c) => {
+app.onError((err) => {
   console.error('Error:', err);
   return new Response(
     JSON.stringify({ success: false, error: 'Internal server error' }),
